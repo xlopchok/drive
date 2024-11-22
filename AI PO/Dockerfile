@@ -37,6 +37,8 @@ WORKDIR /AI PO
 
 RUN pip install -r requirements.txt 
 
+RUN pip install -U numpy==1.26.4
+
 COPY . .
 
 EXPOSE 8501
