@@ -19,6 +19,8 @@ from stl import mesh
 
 from models import EfficientNetRegression
 
+st.title('AI Integration')
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def remove_module_prefix(state_dict):
@@ -60,7 +62,29 @@ def load_ResNet():
     # Remove the 'module.' prefix from checkpoint keys
     cleaned_checkpoint = remove_module_prefix(checkpoint2)
 
-    model = models.resnet18(pretrained=False)
+    model = models.resnet18(pretrained=True)
+
+    # Modify the first convolutional layer to accept 6 channels
+    # Original: Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    # New: Conv2d(6, 64, kernel_size=7, stride=2, padding=3, bias=False)
+
+    # Get the original first conv layer
+    original_conv = model.conv1
+
+    # Create a new conv layer with 6 input channels
+    new_conv = nn.Conv2d(9, original_conv.out_channels, kernel_size=original_conv.kernel_size,
+                        stride=original_conv.stride, padding=original_conv.padding, bias=original_conv.bias)
+
+    # Initialize the new conv layer's weights by copying the original weights and duplicating for the additional channels
+    with torch.no_grad():
+        new_conv.weight[:, :3, :, :] = original_conv.weight
+        new_conv.weight[:, 3:6, :, :] = original_conv.weight  # Duplicate weights for the additional channels
+        new_conv.weight[:, 6:9, :, :] = original_conv.weight
+    # Replace the model's conv1 with the new conv layer
+    model.conv1 = new_conv
+
+    # Modify the fully connected layer for regression
+    model.fc = nn.Linear(model.fc.in_features, 1)
 
     model.load_state_dict(cleaned_checkpoint)
     return model.to(device)
@@ -88,9 +112,6 @@ def run_inference(model, dataloader):
 model_efficientnet = load_EfficientNet()
 model_resnet = load_ResNet()
 model_autoML = load_autoML()
-
-
-st.title('AI Integration')
 
 # Загрузка stl файла
 st.subheader("load .stl file")
