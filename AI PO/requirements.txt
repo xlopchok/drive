@@ -1,19 +1,18 @@
 --find-links https://download.pytorch.org/whl/cu121
+torch
+torchvision
+lightautoml==0.3.8b1
+gensim==4.3.3
 numpy
 pandas
 scikit-learn
-torch
-torchvision
-transformers
-lightautoml==0.3.8b1
-gensim==4.3.3
 pillow
 accelerate
+transformers
 tqdm
 pyyaml
 kaggle
 kagglehub
-pickle
 joblib
-stl
-subprocess
+numpy-stl
+streamlit
