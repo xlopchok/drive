@@ -1,6 +1,6 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu20.04 AS builder
 
-WORKDIR /app
+WORKDIR /AI PO
 COPY ./requirements.txt .
 
 RUN apt-get update && \
@@ -10,22 +10,35 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install kaggle gdown
-
-RUN kaggle datasets download -d stachyslanata/sekrrno && \
-    unzip sekrrno.zip -d /app/ && \
-    rm sekrrno.zip
-
 FROM builder AS stage
 
-WORKDIR /app
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    g++ \
+    libopencv-dev \
+    libeigen3-dev \
+    libassimp-dev \
+    cmake \
+    && apt-get clean
+
+COPY mesh_projection_mt.cpp .
+
+RUN g++ -std=c++17 -O2 -o mesh_projection_mt mesh_projection_mt.cpp \
+    -I/usr/include/opencv4 \
+    -I/usr/include/eigen3 \
+    -lopencv_core \
+    -lopencv_imgcodecs \
+    -lopencv_highgui \
+    -lopencv_imgproc \
+    -lassimp \
+    -pthread
+
+WORKDIR /AI PO
 
 RUN pip install --no-cache-dir -r requirements.txt 
-
-RUN gdown "https://drive.google.com/uc?export=download&id=1gqA-cp3CLLsX9a9URK5GXhwrYTUs47Vy"
 
 COPY . .
 
 EXPOSE 8501
 
-CMD ["streamlit", "run", "app.py"]
+CMD ["streamlit", "run", "front_inference.py"]
