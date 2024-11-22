@@ -35,7 +35,7 @@ RUN g++ -std=c++17 -O2 -o mesh_projection_mt mesh_projection_mt.cpp \
 
 WORKDIR /AI PO
 
-RUN pip install --no-cache-dir -r requirements.txt 
+RUN pip install -r requirements.txt 
 
 COPY . .
 
