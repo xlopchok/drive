@@ -1,0 +1,19 @@
+--find-links https://download.pytorch.org/whl/cu121
+numpy
+pandas
+scikit-learn
+torch
+torchvision
+transformers
+lightautoml==0.3.8b1
+gensim==4.3.3
+pillow
+accelerate
+tqdm
+pyyaml
+kaggle
+kagglehub
+pickle
+joblib
+stl
+subprocess
