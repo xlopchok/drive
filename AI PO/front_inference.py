@@ -1,5 +1,6 @@
 import os
 import glob
+import logging
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,9 @@ import subprocess
 from stl import mesh
 
 from models import EfficientNetRegression
+
+logger = logging.getLogger("MyLogger")
+logger.setLevel(logging.INFO)
 
 st.title('AI Integration')
 
@@ -109,9 +113,9 @@ def run_inference(model, dataloader):
             predictions.extend(outputs.cpu().numpy().flatten())
     return predictions
 
-model_efficientnet = load_EfficientNet()
-model_resnet = load_ResNet()
-model_autoML = load_autoML()
+# model_efficientnet = load_EfficientNet()
+# model_resnet = load_ResNet()
+# model_autoML = load_autoML()
 
 # Загрузка stl файла
 st.subheader("load .stl file")
@@ -158,6 +162,9 @@ with st.spinner('Creating projections, please wait...'):
 # Соберем проекции в один тензор
 img_path = 'images'
 images = []
+
+logger.info(f"{img_path}, {glob.glob(img_path + '/*.png')}")
+
 for img in glob.glob(img_path + '/*.png'):
     if 'spherical' in img or 'cylinder' in img:
         images.append(Image.open(img).convert('RGB'))
