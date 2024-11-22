@@ -1,4 +1,6 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu20.04 AS builder
+# Используем официальный образ Python
+FROM python:3.9-slim
 
 WORKDIR /AI PO
 COPY ./requirements.txt .
