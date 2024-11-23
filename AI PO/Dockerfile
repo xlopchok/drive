@@ -1,6 +1,6 @@
 FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu20.04 AS builder
 
-WORKDIR /AI PO
+WORKDIR /AI_PO
 COPY ./requirements.txt .
 
 RUN apt-get update && \
@@ -33,7 +33,7 @@ RUN g++ -std=c++17 -O2 -o mesh_projection_mt mesh_projection_mt.cpp \
     -lassimp \
     -pthread
 
-WORKDIR /AI PO
+WORKDIR /AI_PO
 
 RUN pip install -r requirements.txt 
 
