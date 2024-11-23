@@ -21,7 +21,7 @@ from stl import mesh
 from models import EfficientNetRegression
 
 logger = logging.getLogger("MyLogger")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 st.title('AI Integration')
 
@@ -101,6 +101,7 @@ def load_autoML():
 
     # Load the AutoML model using joblib
     automl_model = joblib.load(automl_model_path)
+    return automl_model
     
 def run_inference(model, dataloader):
     model.eval()
@@ -113,9 +114,10 @@ def run_inference(model, dataloader):
             predictions.extend(outputs.cpu().numpy().flatten())
     return predictions
 
-# model_efficientnet = load_EfficientNet()
-# model_resnet = load_ResNet()
-# model_autoML = load_autoML()
+with st.spinner('Loading models, please wait...'):
+    model_efficientnet = load_EfficientNet()
+    model_resnet = load_ResNet()
+    model_autoML = load_autoML()
 
 # Загрузка stl файла
 st.subheader("load .stl file")
@@ -141,97 +143,95 @@ if stl_file is not None:
     stl_mesh.save(stl_path)
     
     st.write("Файл успешно загружен и сохранён!")
-else:
-    st.write("Пожалуйста, загрузите STL файл.")
+
+    with st.spinner('Creating projections, please wait...'):
+        input_dir = 'uploaded_files'
+        output_dir = 'images'
+        
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Аргументы для скрипты (директории и радиус)
+        all_dirs = [input_dir, output_dir, '3']
+
+        # Запускаем скрипт на с++ чтобы получить проекции
+        subprocess.run(["./mesh_projection_mt", *all_dirs], capture_output=True)
+        st.success('Ready!')
 
 
-with st.spinner('Creating projections, please wait...'):
-    input_dir = 'uploaded_files'
-    output_dir = 'images'
+    # Соберем проекции в один тензор
+    img_path = 'images'
+    img_path = os.path.join(img_path, stl_file.name[:-4])
+    images = []
     
-    os.makedirs(output_dir, exist_ok=True)
+    output_log_file = "variables_log.txt"
 
-    # Аргументы для скрипты (директории и радиус)
-    all_dirs = [input_dir, output_dir, '3']
+    with open(output_log_file, "w") as log_file:
+        log_file.write(f"img_path: {img_path}\n")
+        log_file.write(f"Image Files: {glob.glob(img_path + '/*.png')}\n")
 
-    # Запускаем скрипт на с++ чтобы получить проекции
-    subprocess.run(["./mesh_projection_mt", *all_dirs], capture_output=True)
-    st.success('Ready!')
+    for img in glob.glob(img_path + '/*.png'):
+        if 'spherical' in img or 'cylinder' in img:
+            images.append(Image.open(img).convert('RGB'))
+        elif 'up' in img or 'left' in img or 'front' in img:
+            images.append(Image.open(img).convert('L'))
+        else: continue
 
+    if images is None:
+        raise ValueError(f"Error loading image: {img_path}")
 
-# Соберем проекции в один тензор
-img_path = 'images'
-images = []
+    # Выведем картинки
+    st.image(images)
 
-logger.info(f"{img_path}, {glob.glob(img_path + '/*.png')}")
+    image_transforms = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.ToTensor(),
+    ])
 
-for img in glob.glob(img_path + '/*.png'):
-    if 'spherical' in img or 'cylinder' in img:
-        images.append(Image.open(img).convert('RGB'))
-    elif 'up' in img or 'left' in img or 'front' in img:
-        images.append(Image.open(img).convert('L'))
-    else: continue
+    images = [image_transforms(img) for img in images]
 
-if images is None:
-    raise ValueError(f"Error loading image: {img_path}")
+    input_tensor = torch.cat(images, dim = 0)
 
-copy_images = images.copy()
-# Выведем картинки
-for img in copy_images:
-    st.image(copy_images[0])
+    using_model = st.radio('Выберите модель: ', ('ResNet18', 'EffiecientNet', 'AutoML'))
 
-image_transforms = transforms.Compose([
-    transforms.Resize((256, 256)),
-    transforms.ToTensor(),
-])
+    outputs = 0.0
+    if using_model == 'ResNet18':
+        model_resnet.eval()
+        input_tensor = input_tensor.unsqueeze(0).to(device)
+        outputs = model_resnet(input_tensor).squeeze().item()
+    elif using_model == 'EffiecientNet':
+        model_efficientnet.eval()
+        input_tensor = input_tensor.unsqueeze(0).to(device)
+        outputs = model_efficientnet(input_tensor).squeeze().item()
+    elif using_model == 'AutoML':
+        model_resnet.eval()
+        model_efficientnet.eval()
 
-images = [image_transforms(img) for img in images]
-
-st.image(images[0])
-
-input_tensor = torch.cat(images, dim = 0)
-
-using_model = st.radio('Выберите модель: ', ('ResNet18', 'EffiecientNet', 'AutoML'))
-
-outputs = 0.0
-if using_model == 'ResNet18':
-    model_resnet.eval()
-    input_tensor = input_tensor.unsqueeze(0).to(device)
-    outputs = model_resnet(images)
-elif using_model == 'EffiecientNet':
-    model_efficientnet.eval()
-    input_tensor = input_tensor.unsqueeze(0).to(device)
-    outputs = model_efficientnet(images)
-elif using_model == 'AutoML':
-    model_resnet.eval()
-    model_efficientnet.eval()
-
-    input_tensor = input_tensor.unsqueeze(0).to(device)
-    
-    outputs_resnet = model_resnet(images)
-    outputs_efficientNet = model_efficientnet(images)
-    nn_outputs = pd.DataFrame({
-        'resnet18_Prediction': outputs_resnet,
-        'effnetb1full_Prediction': outputs_efficientNet
-    })
-    outputs = model_autoML.predict(nn_outputs).data
-    
-st.text(f'Полученный результат: {outputs}')
-    
-# Укажите путь к папке
-folder_path = "путь_к_папке"
+        input_tensor = input_tensor.unsqueeze(0).to(device)
+        
+        outputs_resnet = model_resnet(input_tensor).squeeze().item()
+        outputs_efficientNet = model_efficientnet(input_tensor).squeeze().item()
+        nn_outputs = pd.DataFrame({
+            'resnet18_Prediction': [outputs_resnet],
+            'effnetb1full_Prediction': [outputs_efficientNet]
+        })
+        outputs = model_autoML.predict(nn_outputs).data.squeeze().item()
+        
+    st.text(f'Полученный результат: {outputs}')
+        
+    # Укажите путь к папке
+    folder_path = "путь_к_папке"
 
 
-# Удалим файлы из папок:
-for folder_path in ['uploaded_files', 'images']:
-    # Убедитесь, что папка существует
-    if os.path.exists(folder_path):
-        # Перебираем файлы в папке
-        for file_name in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, file_name)
+    # Удалим файлы из папок:
+    for folder_path in ['uploaded_files', 'images']:
+        # Убедитесь, что папка существует
+        if os.path.exists(folder_path):
+            # Перебираем файлы в папке
+            for file_name in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, file_name)
 
-            # Проверяем, что это файл (не папка)
-            if os.path.isfile(file_path):
-                os.remove(file_path)  # Удаляем файл
+                # Проверяем, что это файл (не папка)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)  # Удаляем файл
 
 
