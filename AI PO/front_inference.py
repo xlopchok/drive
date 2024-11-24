@@ -1,6 +1,7 @@
 import os
 import glob
 import logging
+import shutil
 
 import numpy as np
 import pandas as pd
@@ -23,7 +24,19 @@ from models import EfficientNetRegression
 logger = logging.getLogger("MyLogger")
 logger.setLevel(logging.DEBUG)
 
-st.title('AI Integration')
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: rgb(0, 0, 0); 
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown("<h1 style='color: rgb(60,255,2);'>AI Integration</h1>", unsafe_allow_html=True)
+st.markdown("<h2 style='color: rgbrgb(255,35,166);'>AI Integration</h2>", unsafe_allow_html=True)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -39,32 +52,25 @@ def remove_module_prefix(state_dict):
 
 # Download the model EfficientNet
 def load_EfficientNet():
-    effnetb1full_pytorch_default_1_path = kagglehub.model_download('vasiliygorelov/effnetb1full/PyTorch/default/1')
+    # Указываем путь к модели внутри контейнера
+    model_path = "model/efficientNet.pth"
 
-    # Path to the downloaded model file
-    model_path = f"{effnetb1full_pytorch_default_1_path}/modelefficientnetb10.884312_0.942337.pth"
-
-    # Load the checkpoint
+    # Загружаем чекпоинт модели
     checkpoint = torch.load(model_path)
 
-    # Remove the 'module.' prefix from checkpoint keys
-    cleaned_checkpoint = remove_module_prefix(checkpoint)
-
+    # Инициализируем модель
     model = EfficientNetRegression()
-    model.load_state_dict(cleaned_checkpoint)
+    model.load_state_dict(checkpoint)
+
+    # Переносим модель на устройство (GPU/CPU)
     return model.to(device)
 
 def load_ResNet():
-    resnet18full_pytorch_default_1_path = kagglehub.model_download('vasiliygorelov/resnet18full/PyTorch/default/1')
+    # Указываем путь к модели внутри контейнера
+    model_path = "model/ResNet.pth"
 
-    # Path to the model file
-    model_path = f"{resnet18full_pytorch_default_1_path}/modelresnetfull180.906556_0.952517.pth"
-
-    # Load the checkpoint
-    checkpoint2 = torch.load(model_path, map_location=torch.device('cpu'))
-
-    # Remove the 'module.' prefix from checkpoint keys
-    cleaned_checkpoint = remove_module_prefix(checkpoint2)
+    # Загружаем чекпоинт модели
+    checkpoint = torch.load(model_path)
 
     model = models.resnet18(pretrained=True)
 
@@ -90,16 +96,14 @@ def load_ResNet():
     # Modify the fully connected layer for regression
     model.fc = nn.Linear(model.fc.in_features, 1)
 
-    model.load_state_dict(cleaned_checkpoint)
+    model.load_state_dict(checkpoint)
     return model.to(device)
 
 def load_autoML():
-    automlnorm_other_default_1_path = kagglehub.model_download('vasiliygorelov/automlnorm/Other/default/1')
+    # Путь к модели внутри контейнера
+    automl_model_path = "model/automl_model_norm.pkl"
 
-    # Construct the full path to the model file
-    automl_model_path = f"{automlnorm_other_default_1_path}/automl_model_norm.pkl"
-
-    # Load the AutoML model using joblib
+    # Загружаем модель
     automl_model = joblib.load(automl_model_path)
     return automl_model
     
@@ -114,13 +118,13 @@ def run_inference(model, dataloader):
             predictions.extend(outputs.cpu().numpy().flatten())
     return predictions
 
-with st.spinner('Loading models, please wait...'):
+with st.spinner('Загрузка модели, подождите...'):
     model_efficientnet = load_EfficientNet()
     model_resnet = load_ResNet()
     model_autoML = load_autoML()
 
 # Загрузка stl файла
-st.subheader("load .stl file")
+st.subheader("Загрузите stl файл")
 
 # Загружаем STL файл
 stl_file = st.file_uploader("")
@@ -217,21 +221,27 @@ if stl_file is not None:
         outputs = model_autoML.predict(nn_outputs).data.squeeze().item()
         
     st.text(f'Полученный результат: {outputs}')
-        
-    # Укажите путь к папке
-    folder_path = "путь_к_папке"
 
+    # # Удалим файлы из папок:
+    # for folder_path in ['uploaded_files', 'images']:
+    #     # Убедитесь, что папка существует
+    #     if os.path.exists(folder_path):
+    #         # Перебираем файлы в папке
+    #         for file_name in os.listdir(folder_path):
+    #             file_path = os.path.join(folder_path, file_name)
 
+    #             # Проверяем, что это файл (не папка)
+    #             if os.path.isfile(file_path):
+    #                 os.remove(file_path)  # Удаляем файл
+                    
     # Удалим файлы из папок:
-    for folder_path in ['uploaded_files', 'images']:
-        # Убедитесь, что папка существует
-        if os.path.exists(folder_path):
-            # Перебираем файлы в папке
-            for file_name in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, file_name)
-
-                # Проверяем, что это файл (не папка)
-                if os.path.isfile(file_path):
-                    os.remove(file_path)  # Удаляем файл
+    for dir_path in ['uploaded_files', 'images']:
+        # Удаляем все содержимое папки images
+        for item in os.listdir(dir_path):
+            item_path = os.path.join(dir_path, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)  # Удаление файла
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)  # Удаление папки и её содержимого
 
 
