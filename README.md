@@ -8,7 +8,7 @@ docker build -t app 'AI PO'
 docker run -p 8501:8501 --gpus all app 
 ```
 3. Загрузите файл.stl в соответсвующее поле.
-4. Выбирете модель из списка.
+4. Выберите модель из списка.
    - ResNet18
    - EffiecientNet
    - AutoML
